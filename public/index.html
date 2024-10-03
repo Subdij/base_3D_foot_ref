@@ -80,9 +80,10 @@
 
   createWall(50,1,1,0,0.5,12.5);
   createWall(50,1,1,0,0.5,-12.5);
-  createWall(1,1,7.5,25,0.5,-10);
-  createWall(1,1,7.5,25,0.5,10);
-  createWall(1,1,25,-25,0.5,0);
+  createWall(1,1,9,25,0.5,-8);
+  createWall(1,1,9,25,0.5,8);
+  createWall(1,1,9,-25,0.5,-8);
+  createWall(1,1,9,-25,0.5,8);
 
   // Création des buts
 
@@ -275,7 +276,8 @@ document.addEventListener('keydown', (event) => {
   // Score
 
   function resetBall(){
-    sphereBody.position.set(0, 0.5, 0);
+    sphereBody.position.set(0, 10, 0);
+    sphereBody.quaternion.set(0,0,0,0);
     sphereBody.velocity.set(0,0,0);
   }
 
