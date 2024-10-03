@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Jeu Réseau avec Three.js</title>
+ <style>
+ body { margin: 0; overflow: hidden; }
+ </style>
+</head>
+<body>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+<script>
+  // Connexion au serveur Socket.IO
+  const socket = io();
+
+  // Création de la scène Three.js
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Initialisation du monde physique
+  const world = new CANNON.World();
+  world.gravity.set(0, -9.82, 0); // Gravité vers le bas
+
+  // Création d'un plan au sol
+  const geometry = new THREE.PlaneGeometry(50, 25);
+  const material = new THREE.MeshBasicMaterial({ color: 0x808080, side: THREE.DoubleSide });
+  const plane = new THREE.Mesh(geometry, material);
+  plane.rotation.x = Math.PI / 2;
+  scene.add(plane);
+
+  const groundShape = new CANNON.Plane();
+  const groundBody = new CANNON.Body({
+    mass: 0 // Masse nulle pour un objet statique
+  });
+  groundBody.addShape(groundShape);
+  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  world.addBody(groundBody);
+
+  // Liste des cubes joueurs et des corps physiques
+  const players = {};
+  const playerBodies = {};
+
+  // Création de cubes pour chaque joueur
+  function createPlayerCube(player) {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ color: player.color });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(player.x, player.y, player.z);
+    scene.add(cube);
+
+    // Créer un corps physique pour le joueur
+    const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+    const body = new CANNON.Body({
+      mass: 1,
+      position: new CANNON.Vec3(player.x, player.y, player.z),
+      shape: shape
+    });
+    world.addBody(body);
+    playerBodies[player.id] = body;
+
+    return cube;
+  }
+
+  // Initialisation des joueurs lorsque la connexion est établie
+  socket.on('init', (serverPlayers) => {
+    for (let id in serverPlayers) {
+      players[id] = createPlayerCube(serverPlayers[id]);
+    }
+  });
+
+  // Ajout d'un nouveau joueur
+  socket.on('newPlayer', (player) => {
+    players[player.id] = createPlayerCube(player);
+  });
+
+  // Mise à jour de la position et de la rotation des joueurs
+  socket.on('playerMoved', (player) => {
+    if (players[player.id] && player.id !== socket.id) { // Ne pas mettre à jour la position du joueur local
+      const body = playerBodies[player.id];
+      body.position.set(player.x, player.y, player.z);
+      body.quaternion.set(player.qx, player.qy, player.qz, player.qw);
+      body.velocity.set(0, 0, 0); // Réinitialiser la vitesse pour éviter les mouvements indésirables
+    }
+  });
+
+  // Suppression d'un joueur déconnecté
+  socket.on('playerDisconnected', (id) => {
+    if (players[id]) {
+      scene.remove(players[id]);
+      world.removeBody(playerBodies[id]);
+      delete players[id];
+      delete playerBodies[id];
+    }
+  });
+
+// Contrôle du joueur local (utilisation des touches de direction)
+const moveSpeed = 5;
+const maxSpeed = 6; // Limite de vitesse maximale
+document.addEventListener('keydown', (event) => {
+  const player = players[socket.id];
+  const body = playerBodies[socket.id];
+  if (player && body) {
+    const force = new CANNON.Vec3();
+    if (event.key === 'ArrowUp') force.z = -moveSpeed;
+    if (event.key === 'ArrowDown') force.z = moveSpeed;
+    if (event.key === 'ArrowLeft') force.x = -moveSpeed;
+    if (event.key === 'ArrowRight') force.x = moveSpeed;
+
+    // Vérifier la vitesse actuelle
+    const currentSpeed = body.velocity.length();
+    if (currentSpeed < maxSpeed) {
+      body.applyImpulse(force, body.position);
+    }
+  }
+});
+
+  // Fonction pour envoyer la position et la rotation du joueur local au serveur
+  function sendPlayerPosition() {
+    const body = playerBodies[socket.id];
+    if (body) {
+      socket.emit('move', { 
+        x: body.position.x, 
+        y: body.position.y, 
+        z: body.position.z,
+        qx: body.quaternion.x,
+        qy: body.quaternion.y,
+        qz: body.quaternion.z,
+        qw: body.quaternion.w
+      });
+    }
+  }
+
+  // Création d'une sphère avec des propriétés physiques
+  const radius = 0.6;
+  const sphereGeometry = new THREE.SphereGeometry(radius, 32, 32);
+  const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x0077ff });
+  const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  scene.add(sphereMesh);
+
+  const sphereShape = new CANNON.Sphere(radius);
+  const sphereBody = new CANNON.Body({
+    mass: 1, // Masse de la sphère
+    position: new CANNON.Vec3(0, 10, 0), // Position initiale
+    shape: sphereShape
+  });
+  world.addBody(sphereBody);
+
+  // Envoyer la position de la sphère au serveur
+  function sendSpherePosition() {
+    socket.emit('sphereMove', {
+      x: sphereBody.position.x,
+      y: sphereBody.position.y,
+      z: sphereBody.position.z,
+      qx: sphereBody.quaternion.x,
+      qy: sphereBody.quaternion.y,
+      qz: sphereBody.quaternion.z,
+      qw: sphereBody.quaternion.w
+    });
+  }
+
+  // Recevoir les mises à jour de la position de la sphère depuis le serveur
+  socket.on('updateSpherePosition', (data) => {
+    sphereBody.position.set(data.x, data.y, data.z);
+    sphereBody.quaternion.set(data.qx, data.qy, data.qz, data.qw);
+  });
+
+  // Positionnement de la caméra
+  camera.position.set(0, 18, 20);
+  camera.lookAt(0, 0, 0);
+
+  // Fonction de rendu
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Mise à jour du monde physique
+    world.step(1 / 60);
+
+    // Synchronisation des positions et des rotations des joueurs avec leurs corps physiques
+    for (let id in players) {
+      const player = players[id];
+      const body = playerBodies[id];
+      if (player && body) {
+        player.position.copy(body.position);
+        player.quaternion.copy(body.quaternion);
+      }
+    }
+
+    // Synchronisation de la position et de la rotation de la sphère avec le corps physique
+    sphereMesh.position.copy(sphereBody.position);
+    sphereMesh.quaternion.copy(sphereBody.quaternion);
+
+    // Envoyer la position et la rotation du joueur local au serveur
+    sendPlayerPosition();
+
+    // Envoyer la position de la sphère au serveur
+    sendSpherePosition();
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Interpolation des mouvements et des rotations des autres joueurs
+  socket.on('updatePositions', (serverPlayers) => {
+    for (let id in serverPlayers) {
+      if (players[id] && id !== socket.id) {
+        const player = players[id];
+        const body = playerBodies[id];
+        const targetPosition = new CANNON.Vec3(serverPlayers[id].x, serverPlayers[id].y, serverPlayers[id].z);
+        const targetQuaternion = new CANNON.Quaternion(serverPlayers[id].qx, serverPlayers[id].qy, serverPlayers[id].qz, serverPlayers[id].qw);
+
+        // Interpolation linéaire pour la position
+        body.position.lerp(targetPosition, 0.1);
+
+        // Interpolation linéaire pour la rotation
+        body.quaternion.slerp(targetQuaternion, 0.1);
+      }
+    }
+  });
+</script>
+</body>
+</html>
