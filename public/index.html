@@ -5,10 +5,29 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>Jeu Réseau avec Three.js</title>
  <style>
- body { margin: 0; overflow: hidden; }
+  body {
+            margin: 0;
+            overflow: hidden;
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-family: Arial, sans-serif;
+            color: white;
+            background-color: rgb(223, 22, 22);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        canvas {
+            display: block;
+        }
  </style>
 </head>
 <body>
+  <div id="score">0 - 0</div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
@@ -41,6 +60,31 @@
   groundBody.addShape(groundShape);
   groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(groundBody);
+
+  // Délimitation terrain
+  function createWall(longueur,hauteur,largeur,x,y,z){
+    const geometryWall = new THREE.BoxGeometry(longueur,hauteur,largeur);
+    const materialWall = new THREE.MeshBasicMaterial({color: 0x505050, side: THREE.DoubleSide})
+    const wall = new THREE.Mesh(geometryWall,materialWall);
+    wall.position.set(x,y,z)
+    scene.add(wall);
+
+    const wallShape = new CANNON.Box(new CANNON.Vec3(longueur/2, 5*hauteur, largeur/2));
+    const wallBody = new CANNON.Body({
+      mass: 0,
+      position: new CANNON.Vec3(x,y,z),
+      shape: wallShape
+    });
+    world.addBody(wallBody);
+  }
+
+  createWall(50,1,1,0,0.5,12.5);
+  createWall(50,1,1,0,0.5,-12.5);
+  createWall(1,1,7.5,25,0.5,-10);
+  createWall(1,1,7.5,25,0.5,10);
+  createWall(1,1,25,-25,0.5,0);
+
+  // Création des buts
 
   // Liste des cubes joueurs et des corps physiques
   const players = {};
@@ -200,8 +244,13 @@ document.addEventListener('keydown', (event) => {
 
     // Envoyer la position de la sphère au serveur
     sendSpherePosition();
+    
+    // Vérifier si un but a été marqué
+    checkGoal();
 
     renderer.render(scene, camera);
+
+    
   }
   animate();
 
@@ -222,6 +271,35 @@ document.addEventListener('keydown', (event) => {
       }
     }
   });
+
+  // Score
+
+  function resetBall(){
+    sphereBody.position.set(0, 0.5, 0);
+    sphereBody.velocity.set(0,0,0);
+  }
+
+  function checkGoal() {
+            const goalLimit = 25;  
+            if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
+                score1++;
+                resetBall();
+                updateScore();
+            } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
+                score2++;
+                resetBall();
+                updateScore();
+            }
+        } 
+
+  let score1 = 0;
+  let score2 = 0;
+
+  function updateScore() {
+    document.getElementById('score').innerHTML = `${score1} - ${score2}`;
+  }
+
+  
 </script>
 </body>
 </html>
