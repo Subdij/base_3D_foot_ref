@@ -114,8 +114,8 @@
 
   // Ajouter des murs invisibles autour du terrain
 
-  createInvisibleWall(1, 10, 25, 25, 5, 0); // Mur droit
-  createInvisibleWall(1, 10, 25, -25, 5, 0); // Mur gauche
+  createInvisibleWall(1, 10, 25, 26, 5, 0); // Mur droit
+  createInvisibleWall(1, 10, 25, -26, 5, 0); // Mur gauche
 
 
   // Création des buts
@@ -126,26 +126,32 @@
 
   // Création de cubes pour chaque joueur
   function createPlayerCube(player) {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({ color: player.color });
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.set(player.x, player.y, player.z);
-    scene.add(cube);
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshBasicMaterial({ color: player.color });
+  const cube = new THREE.Mesh(geometry, material);
+  cube.position.set(player.x, player.y, player.z);
+  scene.add(cube);
 
-    // Créer un corps physique pour le joueur
-    const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-    const body = new CANNON.Body({
-      mass: 1,
-      position: new CANNON.Vec3(player.x, player.y, player.z),
-      shape: shape,
-      collisionFilterGroup: GROUP3, // Assigner au groupe 3
-      collisionFilterMask: GROUP1 | GROUP3 | GROUP2 // Interagir avec les groupes 1, 2 et 3
-    });
-    world.addBody(body);
-    playerBodies[player.id] = body;
+  // Add edges to the cube
+  const edges = new THREE.EdgesGeometry(geometry);
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 }); // Set edge color to black
+  const line = new THREE.LineSegments(edges, lineMaterial);
+  cube.add(line);
 
-    return cube;
-  }
+  // Créer un corps physique pour le joueur
+  const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+  const body = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(player.x, player.y, player.z),
+    shape: shape,
+    collisionFilterGroup: GROUP3, // Assigner au groupe 3
+    collisionFilterMask: GROUP1 | GROUP3 | GROUP2 // Interagir avec les groupes 1, 2 et 3
+  });
+  world.addBody(body);
+  playerBodies[player.id] = body;
+
+  return cube;
+}
 
   // Initialisation des joueurs lorsque la connexion est établie
   socket.on('init', (serverPlayers) => {
@@ -312,25 +318,24 @@
   // Score
 
   function resetBall() {
-    sphereBody.position.set(0, 0.5, 0);
+    sphereBody.position.set(0, 5, 0);
     sphereBody.velocity.set(0, 0, 0);
     sphereBody.angularVelocity.set(0, 0, 0); // Réinitialiser la vitesse angulaire
   }
 
   function checkGoal() {
-    const goalLimit = 25;  
-    if (sphereBody.position.x > goalLimit || sphereBody.position.x < -goalLimit) {
-      if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
-        score1++;
-        socket.emit('goal', { team: 1 }); // Envoyer la mise à jour de score au serveur
-      } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
-        score2++;
-        socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
-      }
-      socket.emit('resetBall'); // Envoyer l'événement de réinitialisation de la balle au serveur
-      resetBall(); // Réinitialiser la balle localement
+  const goalLimit = 25;  
+  if (sphereBody.position.x > goalLimit || sphereBody.position.x < -goalLimit) {
+    if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
+      score1++;
+      socket.emit('goal', { team: 1 }); // Envoyer la mise à jour de score au serveur
+    } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
+      score2++;
+      socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
     }
+    resetBall(); // Réinitialiser la balle localement
   }
+}
 
   let score1 = 0;
   let score2 = 0;
@@ -339,7 +344,7 @@
     document.getElementById('score').innerHTML = `${score1} - ${score2}`;
   }
 
-  // Recevoir les mises à jour de score du serveur
+  // Recevoir les mises à jour de score du serveur data1
   socket.on('updateScore', (data) => {
     score1 = data.score1;
     score2 = data.score2;

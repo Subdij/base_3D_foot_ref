@@ -89,11 +89,10 @@ io.on('connection', (socket) => {
       score2++;
     }
     io.emit('updateScore', { score1, score2 });
+    io.emit('resetBall'); // Réinitialiser la balle après un but
   });
 
-  socket.on('resetBall', () => {
-    io.emit('resetBall');
-  });
+
 
 });
 
