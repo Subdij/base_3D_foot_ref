@@ -76,32 +76,45 @@
   groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(groundBody);
 
-  // Délimitation terrain
-  function createWall(longueur, hauteur, largeur, x, y, z) {
-    const geometryWall = new THREE.BoxGeometry(longueur, hauteur, largeur);
-    const materialWall = new THREE.MeshBasicMaterial({ color: 0x505050, side: THREE.DoubleSide });
-    const wall = new THREE.Mesh(geometryWall, materialWall);
-    wall.position.set(x, y, z);
-    scene.add(wall);
+// Délimitation terrain
+function createWall(longueur, hauteur, largeur, x, y, z) {
+  const loader = new THREE.TextureLoader();
+  const textureWall = loader.load('/images/mure.jpg'); // Load the texture
 
-    const wallShape = new CANNON.Box(new CANNON.Vec3(longueur / 2, 5 * hauteur, largeur / 2));
-    const wallBody = new CANNON.Body({
-      mass: 0,
-      position: new CANNON.Vec3(x, y, z),
-      shape: wallShape,
-      collisionFilterGroup: GROUP3, // Assigner au groupe 3
-      collisionFilterMask: GROUP3 | GROUP2 // Interagir avec les groupes 2 et 3
-    });
-    world.addBody(wallBody);
+  // Set the texture to repeat
+  textureWall.wrapS = THREE.RepeatWrapping;
+  textureWall.wrapT = THREE.RepeatWrapping;
+
+  // le repeat de l'image terxture
+  if (longueur > largeur) {
+    textureWall.repeat.set(longueur / 10, hauteur / 10);
+  } else {
+    textureWall.repeat.set(largeur / 10, hauteur / 10);
   }
 
+  const geometryWall = new THREE.BoxGeometry(longueur, hauteur, largeur);
+  const materialWall = new THREE.MeshBasicMaterial({ map: textureWall, side: THREE.DoubleSide }); // Apply the texture
+  const wall = new THREE.Mesh(geometryWall, materialWall);
+  wall.position.set(x, y, z);
+  scene.add(wall);
 
-  createWall(50,1,1,0,0.5,12.5);
-  createWall(50,1,1,0,0.5,-12.5);
-  createWall(1,1,9,25,0.5,-8);
-  createWall(1,1,9,25,0.5,8);
-  createWall(1,1,9,-25,0.5,-8);
-  createWall(1,1,9,-25,0.5,8);
+  const wallShape = new CANNON.Box(new CANNON.Vec3(longueur / 2, hauteur / 2, largeur / 2));
+  const wallBody = new CANNON.Body({
+    mass: 0,
+    position: new CANNON.Vec3(x, y, z),
+    shape: wallShape,
+    collisionFilterGroup: GROUP3, // Assigner au groupe 3
+    collisionFilterMask: GROUP3 | GROUP2 // Interagir avec les groupes 2 et 3
+  });
+  world.addBody(wallBody);
+}
+
+createWall(50,1,1,0,0.5,12.5);
+createWall(50,1,1,0,0.5,-12.5);
+createWall(1,1,9,25,0.5,-8); //droite haut
+createWall(1,1,9,25,0.5,8); //droite bas
+createWall(1,1,9,-25,0.5,-8); //gauche haut
+createWall(1,1,9,-25,0.5,8); //gauche bas
 
   // Création des murs invisibles
   function createInvisibleWall(longueur, hauteur, largeur, x, y, z) {
