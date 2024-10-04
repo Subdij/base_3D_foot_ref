@@ -46,43 +46,74 @@
   const world = new CANNON.World();
   world.gravity.set(0, -9.82, 0); // Gravité vers le bas
 
+  // Groupes de collision
+  const GROUP1 = 1; // Groupe pour les murs invisibles
+  const GROUP2 = 2; // Groupe pour la sphère
+  const GROUP3 = 4; // Groupe pour les joueurs et autres objets
+
   // Création d'un plan au sol
+  const loader = new THREE.TextureLoader();
+  const textureterrain = loader.load('/images/terrain.png');
+
+  // Apply the texture to the material of the plane
   const geometry = new THREE.PlaneGeometry(50, 25);
-  const material = new THREE.MeshBasicMaterial({ color: 0x808080, side: THREE.DoubleSide });
+  const material = new THREE.MeshBasicMaterial({ map: textureterrain, side: THREE.DoubleSide });
   const plane = new THREE.Mesh(geometry, material);
   plane.rotation.x = Math.PI / 2;
   scene.add(plane);
 
   const groundShape = new CANNON.Plane();
   const groundBody = new CANNON.Body({
-    mass: 0 // Masse nulle pour un objet statique
+    mass: 0, // Masse nulle pour un objet statique
+    collisionFilterGroup: GROUP3, // Assigner au groupe 3
+    collisionFilterMask: GROUP3 | GROUP2 // Interagir avec les groupes 2 et 3
   });
   groundBody.addShape(groundShape);
   groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(groundBody);
 
   // Délimitation terrain
-  function createWall(longueur,hauteur,largeur,x,y,z){
-    const geometryWall = new THREE.BoxGeometry(longueur,hauteur,largeur);
-    const materialWall = new THREE.MeshBasicMaterial({color: 0x505050, side: THREE.DoubleSide})
-    const wall = new THREE.Mesh(geometryWall,materialWall);
-    wall.position.set(x,y,z)
+  function createWall(longueur, hauteur, largeur, x, y, z) {
+    const geometryWall = new THREE.BoxGeometry(longueur, hauteur, largeur);
+    const materialWall = new THREE.MeshBasicMaterial({ color: 0x505050, side: THREE.DoubleSide });
+    const wall = new THREE.Mesh(geometryWall, materialWall);
+    wall.position.set(x, y, z);
     scene.add(wall);
 
-    const wallShape = new CANNON.Box(new CANNON.Vec3(longueur/2, 5*hauteur, largeur/2));
+    const wallShape = new CANNON.Box(new CANNON.Vec3(longueur / 2, 5 * hauteur, largeur / 2));
     const wallBody = new CANNON.Body({
       mass: 0,
-      position: new CANNON.Vec3(x,y,z),
-      shape: wallShape
+      position: new CANNON.Vec3(x, y, z),
+      shape: wallShape,
+      collisionFilterGroup: GROUP3, // Assigner au groupe 3
+      collisionFilterMask: GROUP3 | GROUP2 // Interagir avec les groupes 2 et 3
     });
     world.addBody(wallBody);
   }
 
-  createWall(50,1,1,0,0.5,12.5);
-  createWall(50,1,1,0,0.5,-12.5);
-  createWall(1,1,7.5,25,0.5,-10);
-  createWall(1,1,7.5,25,0.5,10);
-  createWall(1,1,25,-25,0.5,0);
+  createWall(50, 1, 1, 0, 0.5, 12.5);
+  createWall(50, 1, 1, 0, 0.5, -12.5);
+  createWall(1, 1, 7.5, 25, 0.5, -10);
+  createWall(1, 1, 7.5, 25, 0.5, 10);
+  createWall(1, 1, 25, -25, 0.5, 0);
+
+  // Création des murs invisibles
+  function createInvisibleWall(longueur, hauteur, largeur, x, y, z) {
+    const wallShape = new CANNON.Box(new CANNON.Vec3(longueur / 2, hauteur / 2, largeur / 2));
+    const wallBody = new CANNON.Body({
+      mass: 0,
+      position: new CANNON.Vec3(x, y, z),
+      shape: wallShape,
+      collisionFilterGroup: GROUP1, // Assigner au groupe 1
+      collisionFilterMask: GROUP3 // Interagir uniquement avec le groupe 3 (joueurs)
+    });
+    world.addBody(wallBody);
+  }
+
+  // Ajouter des murs invisibles autour du terrain
+
+  createInvisibleWall(1, 10, 25, 25, 5, 0); // Mur droit
+  createInvisibleWall(1, 10, 25, -25, 5, 0); // Mur gauche
 
   // Création des buts
 
@@ -103,7 +134,9 @@
     const body = new CANNON.Body({
       mass: 1,
       position: new CANNON.Vec3(player.x, player.y, player.z),
-      shape: shape
+      shape: shape,
+      collisionFilterGroup: GROUP3, // Assigner au groupe 3
+      collisionFilterMask: GROUP1 | GROUP3 | GROUP2 // Interagir avec les groupes 1, 2 et 3
     });
     world.addBody(body);
     playerBodies[player.id] = body;
@@ -143,26 +176,26 @@
     }
   });
 
-// Contrôle du joueur local (utilisation des touches de direction)
-const moveSpeed = 5;
-const maxSpeed = 6; // Limite de vitesse maximale
-document.addEventListener('keydown', (event) => {
-  const player = players[socket.id];
-  const body = playerBodies[socket.id];
-  if (player && body) {
-    const force = new CANNON.Vec3();
-    if (event.key === 'ArrowUp') force.z = -moveSpeed;
-    if (event.key === 'ArrowDown') force.z = moveSpeed;
-    if (event.key === 'ArrowLeft') force.x = -moveSpeed;
-    if (event.key === 'ArrowRight') force.x = moveSpeed;
+  // Contrôle du joueur local (utilisation des touches de direction)
+  const moveSpeed = 5;
+  const maxSpeed = 6; // Limite de vitesse maximale
+  document.addEventListener('keydown', (event) => {
+    const player = players[socket.id];
+    const body = playerBodies[socket.id];
+    if (player && body) {
+      const force = new CANNON.Vec3();
+      if (event.key === 'ArrowUp') force.z = -moveSpeed;
+      if (event.key === 'ArrowDown') force.z = moveSpeed;
+      if (event.key === 'ArrowLeft') force.x = -moveSpeed;
+      if (event.key === 'ArrowRight') force.x = moveSpeed;
 
-    // Vérifier la vitesse actuelle
-    const currentSpeed = body.velocity.length();
-    if (currentSpeed < maxSpeed) {
-      body.applyImpulse(force, body.position);
+      // Vérifier la vitesse actuelle
+      const currentSpeed = body.velocity.length();
+      if (currentSpeed < maxSpeed) {
+        body.applyImpulse(force, body.position);
+      }
     }
-  }
-});
+  });
 
   // Fonction pour envoyer la position et la rotation du joueur local au serveur
   function sendPlayerPosition() {
@@ -183,7 +216,8 @@ document.addEventListener('keydown', (event) => {
   // Création d'une sphère avec des propriétés physiques
   const radius = 0.6;
   const sphereGeometry = new THREE.SphereGeometry(radius, 32, 32);
-  const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x0077ff });
+  const textureSphere = loader.load('/images/balle.jpg');
+  const sphereMaterial = new THREE.MeshBasicMaterial({ map: textureSphere });
   const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
   scene.add(sphereMesh);
 
@@ -191,7 +225,9 @@ document.addEventListener('keydown', (event) => {
   const sphereBody = new CANNON.Body({
     mass: 1, // Masse de la sphère
     position: new CANNON.Vec3(0, 10, 0), // Position initiale
-    shape: sphereShape
+    shape: sphereShape,
+    collisionFilterGroup: GROUP2, // Assigner au groupe 2
+    collisionFilterMask: GROUP3 // Interagir uniquement avec le groupe 3 (joueurs et autres objets)
   });
   world.addBody(sphereBody);
 
@@ -249,8 +285,6 @@ document.addEventListener('keydown', (event) => {
     checkGoal();
 
     renderer.render(scene, camera);
-
-    
   }
   animate();
 
@@ -309,12 +343,10 @@ document.addEventListener('keydown', (event) => {
     updateScore();
   });
 
-    // Recevoir l'événement de réinitialisation de la balle du serveur
-    socket.on('resetBall', () => {
+  // Recevoir l'événement de réinitialisation de la balle du serveur
+  socket.on('resetBall', () => {
     resetBall();
   });
-
-  
 </script>
 </body>
 </html>
