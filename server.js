@@ -25,6 +25,10 @@ const initialPositions = [
   { x: -10, y: 0.5, z: 0 }
 ];
 
+// Variables de score
+let score1 = 0;
+let score2 = 0;
+
 io.on('connection', (socket) => {
   console.log('Nouvel utilisateur connecté :', socket.id);
 
@@ -76,6 +80,21 @@ io.on('connection', (socket) => {
     delete players[socket.id];
     io.emit('playerDisconnected', socket.id);
   });
+
+  // Mettre à jour le score
+  socket.on('goal', (data) => {
+    if (data.team === 1) {
+      score1++;
+    } else if (data.team === 2) {
+      score2++;
+    }
+    io.emit('updateScore', { score1, score2 });
+  });
+
+  socket.on('resetBall', () => {
+    io.emit('resetBall');
+  });
+
 });
 
 // Envoyer les mises à jour de position à une fréquence plus élevée
