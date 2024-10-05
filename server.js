@@ -32,6 +32,9 @@ let score2 = 0;
 io.on('connection', (socket) => {
   console.log('Nouvel utilisateur connecté :', socket.id);
 
+  // Envoyer le score actuel au nouveau client
+  socket.emit('updateScore', { score1, score2 });
+
   // Assigner une position initiale spécifique au joueur
   const playerIndex = Object.keys(players).length % initialPositions.length;
   const initialPosition = initialPositions[playerIndex];
@@ -91,9 +94,6 @@ io.on('connection', (socket) => {
     io.emit('updateScore', { score1, score2 });
     io.emit('resetBall'); // Réinitialiser la balle après un but
   });
-
-
-
 });
 
 // Envoyer les mises à jour de position à une fréquence plus élevée
