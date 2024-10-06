@@ -337,6 +337,10 @@
 
     // Score
 
+    // Variables de score
+let scoreTeam1 = 0;
+let scoreTeam2 = 0;
+
     function resetBall() {
       sphereBody.position.set(0, 5, 0);
       sphereBody.velocity.set(0, 0, 0);
@@ -351,7 +355,7 @@
       } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
         socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
       }
-      // Ne pas réinitialiser la balle localement
+      resetBall(); // Réinitialiser la balle localement
     }
   }
 
