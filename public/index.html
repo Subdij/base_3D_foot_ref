@@ -344,21 +344,17 @@
     }
 
     function checkGoal() {
-      const goalLimit = 25;
-      if (sphereBody.position.x > goalLimit || sphereBody.position.x < -goalLimit) {
-        if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
-          score1++;
-          socket.emit('goal', { team: 1 }); // Envoyer la mise à jour de score au serveur
-        } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
-          score2++;
-          socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
-        }
-        resetBall(); // Réinitialiser la balle localement
+    const goalLimit = 25;
+    if (sphereBody.position.x > goalLimit || sphereBody.position.x < -goalLimit) {
+      if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
+        socket.emit('goal', { team: 1 }); // Envoyer la mise à jour de score au serveur
+      } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
+        socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
       }
+      // Ne pas réinitialiser la balle localement
     }
+  }
 
-    let score1 = 0;
-    let score2 = 0;
 
     function updateScore() {
       document.getElementById('score').innerHTML = `${score1} - ${score2}`;
