@@ -353,7 +353,9 @@ let scoreTeam2 = 0;
       if (sphereBody.position.x > goalLimit) {  // But pour l'équipe 1
         socket.emit('goal', { team: 1 }); // Envoyer la mise à jour de score au serveur
       } else if (sphereBody.position.x < -goalLimit) {  // But pour l'équipe 2
+        score1++;
         socket.emit('goal', { team: 2 }); // Envoyer la mise à jour de score au serveur
+        score2++;
       }
       resetBall(); // Réinitialiser la balle localement
     }
