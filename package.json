@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "espress": "^0.0.0",
     "express": "^4.21.0",
+    "mongoose": "^5.13.22",
     "socket.io": "^4.8.0"
   },
   "name": "base_3d_ref",

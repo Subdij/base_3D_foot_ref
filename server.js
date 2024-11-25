@@ -1,10 +1,29 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// MongoDB connection
+mongoose.connect('mongodb://127.0.0.1:27017/scoreDB', { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false });
+
+mongoose.connection.on('connected', () => {
+  console.log('Connection réussie avec MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('Erreur de connexion avec MongoDB:', err);
+});
+
+const scoreSchema = new mongoose.Schema({
+  score1: Number,
+  score2: Number
+});
+
+const Score = mongoose.model('Score', scoreSchema);
 
 app.use(express.static('public'));
 
@@ -29,8 +48,45 @@ const initialPositions = [
 let score1 = 0;
 let score2 = 0;
 
+// Load initial score from MongoDB
+Score.findOne({}, (err, score) => {
+  if (score) {
+    score1 = score.score1;
+    score2 = score.score2;
+  }
+});
+
+let lobby = [];
+let gameStarted = false;
+let countdownInterval;
+
 io.on('connection', (socket) => {
   console.log('Nouvel utilisateur connecté :', socket.id);
+
+  // Vérifier si le lobby est plein
+  if (lobby.length >= 2) {
+    socket.emit('lobbyFull');
+    socket.disconnect();
+    return;
+  }
+
+  // Ajouter le joueur au lobby
+  lobby.push(socket.id);
+  io.emit('lobbyUpdate', lobby);
+
+  // Vérifier si deux joueurs sont connectés
+  if (lobby.length === 2 && !gameStarted) {
+    gameStarted = true;
+    let countdown = 5;
+    countdownInterval = setInterval(() => {
+      io.emit('countdown', countdown);
+      countdown--;
+      if (countdown < 0) {
+        clearInterval(countdownInterval);
+        io.emit('startGame');
+      }
+    }, 1000);
+  }
 
   // Envoyer le score actuel au nouveau client
   socket.emit('updateScore', { score1, score2 });
@@ -80,8 +136,17 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Utilisateur déconnecté :', socket.id);
+    lobby = lobby.filter(id => id !== socket.id);
+    io.emit('lobbyUpdate', lobby);
     delete players[socket.id];
     io.emit('playerDisconnected', socket.id);
+
+    // Rediriger les joueurs restants vers index.html si un joueur se déconnecte
+    if (lobby.length < 2 && gameStarted) {
+      gameStarted = false;
+      clearInterval(countdownInterval);
+      io.emit('redirectToLobby');
+    }
   });
 
   // Mettre à jour le score
@@ -93,6 +158,11 @@ io.on('connection', (socket) => {
     }
     io.emit('updateScore', { score1, score2 });
     io.emit('resetBall'); // Réinitialiser la balle après un but
+
+    // Save updated score to MongoDB
+    Score.findOneAndUpdate({}, { score1, score2 }, { upsert: true }, (err) => {
+      if (err) console.error('Failed to update score in MongoDB:', err);
+    });
   });
 });
 
@@ -104,5 +174,5 @@ setInterval(() => {
 
 const PORT = 3000;
 server.listen(PORT, () => {
-  console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+  console.log(`Serveur en cours d'exécution sur http://127.0.0.1:${PORT}`);
 });
